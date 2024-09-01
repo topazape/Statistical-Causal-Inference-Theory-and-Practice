@@ -1,0 +1,159 @@
+---
+title: "chapter3_統計的因果推論における重要な仮定"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+library(patchwork)
+
+DATA03 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data03.csv"
+```
+
+## SUTVA (Stable Unit Treatment Value Assumption)
+
+因果推論を可能にするための重要な仮定。処置を受ける個体（unit）ごとに処置の値が安定的であるという仮定。
+
+1.  相互干渉がない（no interference）
+    -   個体 A に対しての処置が別の個体 B に対して影響を及ぼさない
+2.  個体に対する隠れた処置がない（no hidden variations of treatments）
+    -   ある処置を受ける個体が、その処置を別の形で受けてはいけない
+
+## 実験研究における平均処置効果（ATE）の推定
+
+$\tau_{ATE} = \mathbb{E}[Y_i(1)] - \mathbb{E}[Y_i(0)]$
+
+無作為割付けの場合、独立性の条件が満たされることから、
+
+$\mathbb{E}[Y_i|Ti = 1] = \mathbb{E}[Y_i(1)|T_i = 1] = \mathbb{E}[Y_i(1)]$
+
+$\mathbb{E}[Y_i|Ti = 0] = \mathbb{E}[Y_i(0)|T_i = 0] = \mathbb{E}[Y_i(0)]$
+
+が成り立つ。したがって、
+
+$\mathbb{E}[Y_i|T_i = 1] - \mathbb{E}[Y_i|T_i = 0] = \mathbb{E}[Y_i(1)] - \mathbb{E}[Y_i(0)]$
+
+が成り立つ。つまり、無作為割付けの場合、観測量のみから平均処置効果（ATE）を適切に推定できる。
+
+## 共変量の役割
+
+```{r}
+df <- read_csv(DATA03)
+df
+```
+
+```{r}
+df |>
+  group_by(x1) |>
+  summarise(
+    rate = mean(t1)
+  )
+```
+
+```{r}
+df |>
+  summarize(
+    naive_ATE = mean(if_else(t1 == 1, y3, NA), na.rm = TRUE) - mean(if_else(t1 == 0, y3, NA), na.rm = TRUE),
+    ATE = mean(y1t) - mean(y0t),
+  )
+```
+
+## 回帰分析と共分散分析
+
+```{r}
+p1 <- df |>
+  ggplot(aes(x = x1, y = y3)) +
+  geom_point(
+    fill = NA,
+    shape = 21,
+    size = 3,
+  ) +
+  labs(
+    title = "散布図（全集団）",
+    x = "入学試験",
+    y = "期末試験"
+  ) +
+  coord_cartesian(x = c(60, 100), y = c(60, 100)) +
+  theme(text = element_text(family = "Hiragino Sans"))
+
+p2 <- df |>
+  ggplot(aes(x = x1, y = y3)) +
+  geom_point(
+    fill = NA,
+    shape = 21,
+    size = 3,
+  ) +
+  stat_smooth(
+    method = "lm",
+    se = FALSE,
+    size = 0.5,
+    color = "black",
+    fullrange = TRUE,
+    ) +
+  labs(
+    title = "回帰直線（全集団）",
+    x = "入学試験",
+    y = "期末試験"
+  ) +
+  scale_x_continuous(limits = c(60, 100)) +
+  scale_y_continuous(limits = c(60, 100)) +
+  coord_cartesian(x = c(60, 100), y = c(60, 100)) +
+  theme(text = element_text(family = "Hiragino Sans"))
+
+
+p1 + p2
+```
+
+```{r}
+p1 <- df |> mutate(t1 = factor(t1)) |>
+  ggplot(aes(x = x1, y = y3, shape = t1)) +
+  geom_point(size = 3) +
+  scale_shape_manual(values = c(4, 2)) +
+  labs(
+    title = "散布図（群ごと）",
+    x = "入学試験",
+    y = "期末試験"
+  ) +
+  coord_cartesian(x = c(60, 100), y = c(60, 100)) +
+  theme(
+    text = element_text(family = "Hiragino Sans"),
+    legend.position = "none"
+  )
+
+p2 <- df |> mutate(t1 = factor(t1)) |>
+  ggplot(aes(x = x1, y = y3, shape = t1)) +
+  geom_point(size = 3) +
+  stat_smooth(
+    method = "lm",
+    se = FALSE,
+    size = 0.5,
+    color = "black",
+    fullrange = TRUE,
+    ) +
+  scale_shape_manual(values = c(4, 2)) +
+  labs(
+    title = "散布図（群ごと）",
+    x = "入学試験",
+    y = "期末試験"
+  ) +
+  scale_x_continuous(limits = c(60, 100)) +
+  scale_y_continuous(limits = c(60, 100)) +
+  coord_cartesian(x = c(60, 100), y = c(60, 100)) +
+  theme(
+    text = element_text(family = "Hiragino Sans"),
+    legend.position = "none"
+    )
+
+p1 + p2
+```
+
+```{r}
+model1 <- df |>
+  lm(data = _, y3 ~ x1 + t1)
+
+print(summary(model1))
+print(confint(model1))
+```

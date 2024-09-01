@@ -1,0 +1,80 @@
+---
+title: "chapter2_潜在的結果変数の枠組み"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+
+DATA02 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data02.csv"
+df <- read_csv(DATA02)
+df
+```
+
+## 処置効果
+
+個体因果効果（ICE: individual causal effect）
+
+$\tau_i = Y_i(1) - Y_i(0)$
+
+平均因果効果（ATE: average treatment effect）
+
+$\tau_{ATE} = \mathbb{E}[Y_i(1) - Y_i(0)] = \mathbb{E}[Y_i(1)] - \mathbb{E}[Y_i(0)]$
+
+処置群の平均処置効果（ATT: average treatment effect on the treated）
+
+$\tau_{ATT} = \mathbb{E}[Y_i(1) - Y_i(0) | T_i = 1] = \mathbb{E}[Y_i(1) | T_i = 1] - \mathbb{E}[Y_i(0) | T_i = 1]$
+
+```{r}
+df |>
+  summarize(
+    ATE = mean(y1t - y0t),
+    naive_ATE = mean(y1, na.rm = TRUE) - mean(y0, na.rm = TRUE),
+    ATT = mean(if_else(t1 == 1, y1t, NA), na.rm = TRUE) - mean(if_else(t1 == 1, y0t, NA), na.rm = TRUE)
+  )
+```
+
+処置が無作為に割り付けられている場合、ATE とATT は同じになるが、処置の割り付けが無作為でない場合、個体処置効果 $\tau_i$ が母集団全体で異なっているならば、ATE と ATT は異なる値となる可能性がある。
+
+## 無作為割付けによる分析の例
+
+```{r}
+set.seed(1)
+r0 <- runif(20, min = 0, max = 1)
+r1 <- round(r0, digits = 0)
+y2 <- NULL
+y2[r1 == 1] <- df$y1t[r1 == 1]
+y2[r1 == 0] <- df$y0t[r1 == 0]
+
+df2 <- tibble(
+  r1,
+  y2
+)
+
+df2 |>
+  group_by(r1) |>
+  summarise(
+    mean_y2 = mean(y2),
+  ) |>
+  pivot_wider(
+    names_from = r1,
+    values_from = mean_y2,
+    names_prefix = "mean_y2_r1_",
+  ) |>
+  mutate(
+    difference = mean_y2_r1_1 - mean_y2_r1_0
+  )
+```
+
+## 2 標本 $t$ 検定
+
+```{r}
+t.test(
+  df2$y2[r1 == 1],
+  df2$y2[r1 == 0],
+  var.equal = FALSE
+)
+```

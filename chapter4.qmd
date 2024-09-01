@@ -1,0 +1,156 @@
+---
+title: "chapter4_推測統計の基礎"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+
+DATA04 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data04.csv"
+```
+
+## 標準誤差
+
+標本平均 $\bar{X}$ の標準誤差 $s.e.(\bar{X})$ は以下である。ここで、$n$ は標本サイズ、$\sigma$ は母標準偏差を表す。
+
+$$
+s.e.(\bar{X}) = \frac{\sigma}{\sqrt{n}}
+$$
+
+### 母集団データ
+
+```{r}
+x1 <- tribble(
+  ~name, ~height,
+  "A", 165,
+  "B", 166,
+  "C", 171,
+  "D", 180,
+)
+
+x1
+```
+
+$N$ を母集団サイズとした時、母平均 $\mu$ 、母標準偏差 $\sigma$ は以下である。
+
+$$
+\mu = \frac{1}{N} \sum_{i=1}^N{X_i} \\
+\sigma = \sqrt{\frac{1}{N} \sum_{i=1}^{N}({X_i - \mu})^{2}}
+$$
+
+```{r}
+N1 <- 4 # 母集団サイズ
+n1 <- 2 # 標本サイズ
+mu <- mean(x1$height)
+hensa <- x1$height - mu
+hensa2 <- hensa^2
+sigma2 <- sum(hensa2) / N1
+sigma <- sqrt(sigma2)
+
+print(mu)
+print(sigma)
+```
+
+### 標本抽出と標本平均
+
+```{r}
+xs <- combn(x1$height, n1) # 標本サイズは 2
+xbars <- apply(xs, 2, mean) # 標本平均; 母平均に一致する
+
+print(xbars)
+print(mean(xbars))
+```
+
+```{r}
+hensab <- xbars - mu
+hensa2b <- hensab^2
+sigma2b <- sum(hensa2b) / ncol(xs)
+sigmab <- sqrt(sigma2b) # 標本平均の標準偏差
+
+print(sigmab)
+```
+
+### 標本平均のばらつき
+
+```{r}
+se0 <- sigma / sqrt(n1) # 標本平均の標準誤差
+correct <- sqrt((N1 - n1) / (N1 - 1)) # 有限修正項
+se1 <- se0 * correct
+print(se1)
+```
+
+## 信頼区間
+
+### 標本平均の信頼区間
+
+$$
+\bar{X} \pm t_\alpha(df) \times \frac{s}{\sqrt{n}}
+$$
+
+### 信頼区間による $t$ 検定
+
+```{r}
+qt(p = 0.025, df = 49, lower.tail = FALSE)
+```
+
+### 信頼区間による対応のある場合の 2 標本 $t$ 検定
+
+```{r}
+df <- read_csv(DATA04)
+
+df
+```
+
+```{r}
+n1 <- nrow(df)
+diff <- df$y1t - df$y0t
+m1 <- mean(diff)
+s1 <- sd(diff)
+talpha <- qt(p = 0.025, df = n1 - 1, lower.tail = FALSE)
+print(m1 - talpha * s1 / sqrt(n1))
+print(m1 + talpha * s1 / sqrt(n1))
+```
+
+```{r}
+t.test(
+  x = df$y1t - df$y0t
+)
+```
+
+### 信頼区間による対応のない場合の 2 標本 $t$ 検定
+
+標準誤差
+
+$$
+s.e.(\bar{Y}^{obs}_1 - \bar{Y}^{obs}_0) = \sqrt{\frac{s_0^2}{n_0} + \frac{s_1^2}{n_1}} \\
+df = \frac{
+\left( \frac{s_0^2}{n_0} + \frac{s_1^2}{n_1} \right)^2
+}{
+\frac{ \left( \frac{s_0^2}{n_0} \right)^2 }{n_0 - 1} +
+\frac{ \left( \frac{s_1^2}{n_1} \right)^2 }{n_1 - 1}
+}
+$$
+
+```{r}
+y0obs <- df |> filter(!is.na(y0)) |> pull(y0)
+y1obs <- df |> filter(!is.na(y1)) |> pull(y1)
+n0 <- length(y0obs)
+n1 <- length(y1obs)
+s0 <- sd(y0obs)
+s1 <- sd(y1obs)
+numerator <- (s1^2 / n1 + s0^2 / n0)^2
+denominator <- ((s1^2 / n1)^2) / (n1 - 1) + ((s0^2 / n0)^2) / (n0 - 1)
+df1 <- numerator / denominator
+xbar <- mean(y1obs) - mean(y0obs)
+se1 <- sqrt((s1^2 / n1) + (s0^2 / n0))
+talpha <- qt(p = 0.025, df = df1, lower.tail = FALSE)
+print(xbar - talpha * se1)
+print(xbar + talpha * se1)
+```
+
+```{r}
+t.test(y1obs, y0obs, var.equal = FALSE)
+```
