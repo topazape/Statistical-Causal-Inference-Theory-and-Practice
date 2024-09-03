@@ -1,0 +1,141 @@
+---
+title: "chapter6_図で理解する重回帰モデルの基礎"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+
+DATA06 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data06.csv"
+
+data06 <- read_csv(DATA06)
+```
+
+## 分散
+
+変数 $Y$ の不偏分散
+
+$$
+\mathrm{var}[Y] = \frac{1}{n - 1} \sum_{i=1}^n {\left(Y_i - \bar{Y}\right)^2}
+$$
+
+```{r}
+hensa <- data06$y1 - mean(data06$y1)
+hensa2 <- hensa^2
+tss <- sum(hensa2)
+
+print(tss)
+print(tss / (NROW(data06) - 1))
+print(var(data06$y1))
+```
+
+## ESS と USS
+
+```{r}
+model1 <- data06 |> lm(data = _, y1 ~ x1)
+summary(model1)
+```
+
+```{r}
+confint(model1, level = 0.95)
+```
+
+```{r}
+data06 |>
+  ggplot(aes(x = x1, y = y1)) +
+  geom_point(shape = 21, size = 2)
+```
+
+ESS (Explained Sum of Squares)
+
+$$
+ESS = \sum_{i=1}^{n} {\left(\hat{Y_i} - \bar{Y}\right)^2}
+$$
+
+```{r}
+yhat1 <- -3.4217 + 2.7044 * data06$x1
+yhat2 <- (yhat1 - mean(data06$y1))^2
+ess <- sum(yhat2)
+
+print(yhat1)
+print(yhat2)
+print(ess)
+print(predict(model1))
+```
+
+USS (Unexplained Sum of Squares)
+
+$$
+USS = \sum_{i=1}^{n} {\left(Y_i - \hat{Y_i}\right)^2} = \sum_{i=1}^{n} {e_{i}^2}
+$$
+
+```{r}
+e1 <- data06$y1 - yhat1
+e2 <- e1^2
+uss <- sum(e2)
+
+print(e1)
+print(e2)
+print(uss)
+print(resid(model1))
+```
+
+## 決定係数
+
+$$
+R^2 = 1 - \frac{\sum{\left(Y_i - \hat{Y}\right)^2}}{\sum{\left(Y_i - \bar{Y}\right)^2}} = 1 - \frac{USS}{TSS}
+$$
+
+```{r}
+print(1 - uss / tss)
+print(summary(model1)$r.squared)
+```
+
+## 回帰係数の標準誤差と回帰の標準誤差
+
+回帰係数 $\hat{\beta_1}$ の標準偏差
+
+$$
+s.e.\left(\hat{\beta_1}\right) = \frac{s_{reg}}{\sqrt{\sum\left(X_i - \bar{X}\right)^2}}
+$$
+
+回帰の標準誤差（standard error of the regression）
+
+$$
+s_{reg} = \sqrt{\frac{\sum\left(Y_i - \hat{Y_i}\right)^2}{n-k}} = \sqrt{\frac{USS}{n-k}}
+$$
+
+## 三変数の重回帰モデル
+
+二段階の推定モデル
+
+```{r}
+model1 <- lm(data06$x1 ~ data06$x2)
+ex1 <- resid(model1)
+model2 <- lm(data06$y1 ~ ex1)
+
+summary(model2)
+```
+
+重回帰モデル
+
+```{r}
+model3 <- lm(data06$y1 ~ data06$x1 + data06$x2)
+print(summary(model3))
+print(confint(model3, level = 0.95))
+```
+
+## 共分散分析（再考）
+
+```{r}
+DATA03 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data03.csv"
+data03 <- read_csv(DATA03)
+
+model1 <- lm(data = data03, t1 ~ x1)
+et1 <- resid(model1)
+model2 <- lm(y3 ~ et1, data = data03)
+summary(model2)
+```
