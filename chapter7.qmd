@@ -1,0 +1,194 @@
+---
+title: "chapter7_最小二乗法による重回帰モデルの仮定と診断１"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+library(stargazer)
+library(car)
+
+DATA07A <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data07a.csv"
+DATA07B <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data07b.csv"
+DATA07C <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data07c.csv"
+DATA07D <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data07d.csv"
+
+data07a <- read_csv(DATA07A)
+data07b <- read_csv(DATA07B)
+data07c <- read_csv(DATA07C)
+data07d <- read_csv(DATA07D)
+```
+
+## 仮定１：誤差項の期待値ゼロ
+
+```{r}
+set.seed(1)
+n1 <- 1000
+a0 <- 1
+b1 <- 1.5
+x1 <- rnorm(n = n1)
+u1 <- rnorm(n = n1, mean = 10, sd = 1)
+y1 <- a0 + b1 * x1 + u1
+model1 <- lm(y1 ~ x1)
+summary(model1) # 切片は正しく推定できていないが、傾きは正しく推定できている
+```
+
+## 仮定２：パラメータ（母数）における線形性
+
+\$\$ \beta\_0 = 1.0, \beta*1 = 1.5,\* \varepsilon*i\* \sim \mathcal{N}(0, 1) \\ X{1i} \sim \mathcal{N}(0, 1), X{2i} \sim \mathcal{LN}(0, 1) \\
+
+```{=tex}
+\begin{aligned}
+Y_{1i} &= \beta_0 + \beta_1 X_{1i} + \varepsilon_i \\
+Y_{2i} &= \beta_0 + \beta_1 \log{X_{2i}} + \varepsilon_i \\
+Y_{3i} &= \exp\left( \beta_0 + \beta_1 X_{1i} + \varepsilon_i \right) \\
+Y_{4i} &= \beta_0 X_{2i}^{\beta_1} e^{\varepsilon_i}
+\end{aligned}
+```
+\$\$
+
+### 線形モデルによる推定
+
+```{r}
+model1 <- lm(y1 ~ x1, data = data07a)
+model2 <- lm(y2 ~ x2, data = data07a)
+model3 <- lm(y3 ~ x1, data = data07a)
+model4 <- lm(y4 ~ x2, data = data07a)
+
+# モデル2 ~ 4 は beta_1 をうまく推定できていない
+stargazer::stargazer(
+  model1, model2, model3, model4,
+  type = "text"
+)
+```
+
+### 変数変換
+
+```{r}
+model5 <- lm(y2 ~ log(x2), data = data07a)
+model6 <- lm(log(y3) ~ x1, data = data07a)
+model7 <- lm(log(y4) ~ log(x2), data = data07a)
+
+stargazer::stargazer(
+  model5, model6, model7,
+  type = "text"
+)
+```
+
+### 変数の線形性と母数の線形性の違い
+
+```{r}
+set.seed(1)
+n1 <- 1000
+
+b0 <- 1
+b1 <- 0.6
+b2 <- 0.4
+x3 <- runif(n = n1)
+x4 <- runif(n = n1)
+e1 <- rnorm(n = n1)
+
+y5 <- b0 * x3^b1 * x4^b2 * exp(e1)
+y6 <- b0 * x3^b1 * x4^b2 + e1
+
+model8 <- lm(y5 ~ x3 + x4)
+model9 <- lm(log(y5) ~ log(x3) + log(x4))
+model10 <- lm(y6 ~ x3 + x4)
+model11 <- lm(log(y6) ~ log(x3) + log(x4))
+
+stargazer::stargazer(
+  model8, model9, model10, model11,
+  type = "text"
+)
+```
+
+### 多変量における診断方法
+
+```{r}
+model12 <- lm(y1 ~ x1 + x3, data = data07b)
+model13 <- lm(y1 ~ log(x1) + log(x3), data = data07b)
+model14 <- lm(log(y1) ~ x1 + x3, data = data07b)
+model15 <- lm(log(y1) ~ log(x1) + log(x3), data = data07b)
+```
+
+```{r}
+car::crPlots(model12)
+```
+
+```{r}
+car::crPlots(model13)
+```
+
+```{r}
+car::crPlots(model14)
+```
+
+```{r}
+car::crPlots(model15)
+```
+
+```{r}
+model16 <- lm(log(y1) ~ x1 + log(x3), data = data07b)
+car::crPlots(model16)
+```
+
+```{r}
+summary(model16)
+```
+
+## 仮定３：誤差項の条件付き期待値ゼロ
+
+### 不要な変数をモデルに取り入れる問題
+
+$$
+Y_i = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \beta_3 X_{3i} + \varepsilon_i \\
+\beta_0 = 1.0, \quad \beta_1 = 1.3, \quad \beta_2 = 1.2, \quad \beta_3 = 0.0, \quad \varepsilon_i \sim \mathcal{N}(0, 1)
+$$
+
+```{r}
+model17 <- lm(y1 ~ x1, data = data07c)
+model18 <- lm(y1 ~ x1 + x2, data = data07c)
+model19 <- lm(y1 ~ x1 + x2 + x3, data = data07c)
+
+stargazer::stargazer(
+  model17, model18, model19,
+  type = "text"
+)
+```
+
+```{r}
+library(broom)
+
+tidy_model17 <- broom::tidy(model17, conf.int = TRUE) |> mutate(model = "model17")
+tidy_model18 <- broom::tidy(model18, conf.int = TRUE) |> mutate(model = "model18")
+tidy_model19 <- broom::tidy(model19, conf.int = TRUE) |> mutate(model = "model19")
+tidy_models <- bind_rows(tidy_model17, tidy_model18, tidy_model19)
+
+tidy_models
+```
+
+```{r}
+tidy_models |>
+  ggplot(aes(x = term, y = estimate, color = model)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high),
+    width = 0.2,
+    position = position_dodge(width = 0.5)
+  )
+```
+
+### 中間変数をモデルに取り入れる問題
+
+```{r}
+model20 <- lm(y1 ~ x1, data = data07d)
+model21 <- lm(y1 ~ x1 + x2, data = data07d)
+
+stargazer::stargazer(
+  model20, model21,
+  type = "text"
+)
+```

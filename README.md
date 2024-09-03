@@ -7,3 +7,4 @@
 - [chapter4 推測統計の基礎：標準誤差と信頼区間](./chapter4.md)
 - [chapter5 回帰分析の基礎](./chapter5.md)
 - [chapter6 図で理解する重回帰モデルの基礎](./chapter6.md)
+- [chapter7 最小二乗法による重回帰モデルの仮定と診断１](./chapter7.md)
