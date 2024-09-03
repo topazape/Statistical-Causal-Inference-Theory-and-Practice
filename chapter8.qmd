@@ -1,0 +1,233 @@
+---
+title: "chapter8_最小二乗法による重回帰モデルの仮定と診断２"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+library(patchwork)
+library(GGally)
+library(stargazer)
+library(car)
+
+DATA08A <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data08a.csv"
+DATA08B <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data08b.csv"
+DATA08C <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data08c.csv"
+
+data08a <- read_csv(DATA08A)
+data08b <- read_csv(DATA08B)
+data08c <- read_csv(DATA08C)
+```
+
+## 仮定４：完全な多重共線性がないこと
+
+### 多重共線性
+
+説明変数の間の相関係数が 1.0 ではないものの、強い相関があることを、多重共線性（multicollinearity） という。説明変数の間の相関係数が 1.0 の場合を完全な多重共線性（perfect multicollinearity）といい、重回帰分析では禁止されているが、多重共線性は禁止事項ではない。
+
+### 多重共線性の診断：VIF
+
+分散拡大要因（VIF: variance inflation factor）
+
+説明変数が $p$ 個ある重回帰モデル $\hat{Y_i} = \hat{\beta_0} + \hat{\beta_1} X_{1i} + \hat{\beta_2} X_{2i} + \cdots + \hat{\beta_p} X_{pi}$ を考える 。$R_j^2$ は $p$ 個の $X$ のうち、$j$ 番目の $X_{ji}$ を左辺に持ってきて、残りの $X$ を右辺に持ってきた時の重回帰モデル $\hat{X_{ji}} = \hat{\gamma_0} + \hat{\gamma_1} X_{1i} + \cdots + \hat{\gamma_p} X_{pi}$ における決定係数である。
+
+$$
+VIF = \frac{1}{1 - Rj^2}
+$$
+
+$VIF$ は 10 を超えると、$R_j^2$ が 0.9 を超えていることを意味するため、多重共線性の影響が強く出始めていると考えられる。ただし、 $VIF \ge 10$ だからといって自動的に問題視する必要はないとも指摘されている。多重共線性が発生していても回帰係数の推定自体は不偏に行うことができるが、標準誤差が大きくなる点が問題である。
+
+### 共変量における多重共線性
+
+```{r}
+GGally::ggpairs(data08a, columns= 2:4)
+```
+
+VIF の計算
+
+```{r}
+model1a <- lm(x1 ~ x2 + x3, data = data08a)
+rj2a <- summary(model1a)$r.squared
+print(1 / (1 - rj2a))
+
+model1b <- lm(x2 ~ x1 + x3, data = data08a)
+rj2b <- summary(model1b)$r.squared
+print(1 / (1 - rj2b))
+
+model1c <- lm(x3 ~ x1 + x2, data = data08a)
+rj2c <- summary(model1c)$r.squared
+print(1 / (1 - rj2c))
+```
+
+```{r}
+model2 <- lm(y1 ~ x1, data = data08a)
+model3 <- lm(y1 ~ x1 + x2, data = data08a)
+model4 <- lm(y1 ~ x1 + x3, data = data08a)
+model5 <- lm(y1 ~ x1 + x2 + x3, data = data08a)
+
+stargazer::stargazer(
+  model2, model3, model4, model5,
+  type = "text"
+)
+```
+
+```{r}
+car::vif(model5)
+```
+
+## 仮定５：誤差項の分散均一性
+
+$$
+Y_i = \beta_0 + \beta_1 X_{1i} + \varepsilon_i
+$$
+
+の時、 $X_1$ から $Y$ への効果を知りたいとする。
+
+$$
+\mathrm{var} \left[ \varepsilon_i | X_{1i} \right] = \sigma^2
+$$
+
+上記のように $X_1$ を条件とした時、誤差項 $\varepsilon_i$ の分散が定数 $\sigma^2$ であることを分散均一性（homoskedasiticity）という。一方、
+
+$$
+\mathrm{var} \left[ \varepsilon_i | X_{1i} \right] = \sigma_i^2
+$$
+
+のように $X_1$ を条件とした時、誤差項 $\varepsilon_i$ の分散 $\sigma_i^2$ が定数でないことを分散不均一性（heteroskedasiticity）という。$\sigma_i^2$ は個体 $i$ ごとに誤差項の大きさが異なることを意味している。
+
+### 不均一分散の影響
+
+1.  誤差項の期待値ゼロ
+2.  パラメータにおける線形性
+3.  誤差項の条件付き期待値ゼロ
+
+が満たされているとき、最小二乗法による回帰係数の推定量は、線形不偏推定量である。この３つに加えて、
+
+4.  多重共線性がないこと
+5.  誤差項の分散均一性
+
+も満たされている時、最小二乗法による回帰係数の推定量は、最良線形不偏推定量（BLUE: Best Linear Unbiased Estimator）と言われる。
+
+### 不均一分散の診断
+
+```{r}
+p1 <- ggplot(data08b, aes(x = x1, y = y1)) +
+  geom_point(shape = 21)
+
+p2 <- ggplot(data08b, aes(x = x1, y = y2)) +
+  geom_point(shape = 3)
+
+p1 + p2
+```
+
+```{r}
+model1a <- lm(y1 ~ x1, data = data08b)
+model2a <- lm(y2 ~ x1, data = data08b)
+
+stargazer::stargazer(
+  model1a, model2a,
+  type = "text"
+)
+```
+
+#### ブルーシュ・ペイガン検定（Breusch-Pagan Test）
+
+```{r}
+resid2a <- residuals(model2a)
+resid2b <- resid2a^2
+model2b <- lm(resid2b ~ x1, data = data08b)
+bp2 <- summary(model2b)$r.squared * 1000
+pchisq(q = bp2, df = 1, lower.tail = FALSE)
+```
+
+```{r}
+library(lmtest)
+
+print(lmtest::bptest(model2a))
+print(lmtest::bptest(model2a)$p.value)
+
+print(lmtest::bptest(model1a))
+print(lmtest::bptest(model1a)$p.value)
+```
+
+### 不均一分散への対処法１：加重最小二乗法
+
+仮定２（パラメータにおける線形性）は満たされているが、ブルーシュ・ペイガン検定の $p$ 値が 0.05 未満だったとき、誤差項の分散を不均一にしている変数およびその関数の形がわかるならば、加重最小二乗法（WLS: weighted least squares）を用いることで対処できる。
+
+誤差項の分散を $exp[1.5x_{1i}]$ とした時、不均一分散の理由は変数 $X_1$ にあることがわかる。その関数は指数関数であることもわかる。よって、加重最小二乗法は以下の式になる。
+
+$$
+\frac{Y_i}{exp(1.5 X_{1i})} = \frac{\beta_0}{exp(1.5 X_{1i})} + \beta_1 \frac{X_{1i}}{exp(1.5 X_{1i})} + \frac{\varepsilon_i}{exp(1.5 X_{1i})}
+$$
+
+```{r}
+model5 <- lm(y2 ~ x1, weights = (1 / exp(1.5 * x1)), data = data08b)
+summary(model5)
+```
+
+誤差項の分散を不均一にしている変数およびその関数の形がわからない場合、実行可能一般化最小二乗法（FGLS: feasible generalized least squares）を用いることができる。
+
+```{r}
+logresid2b <- log(resid2b)
+model6 <- lm(logresid2b ~ x1, data = data08b)
+hhat1 <- predict(model6)
+hhat2 <- exp(hhat1)
+model7 <- lm(y2 ~ x1, weights=(1 / hhat2), data = data08b)
+summary(model7)
+```
+
+### 不均一分散への対処法２：不均一分散に頑健な標準誤差
+
+```{r}
+model2 <- lm(y2 ~ x1, data = data08b)
+e1 <- resid(model2a)
+e2 <- e1^2
+hensax1 <- data08b$x1 - mean(data08b$x1)
+hensax2 <- hensax1^2
+numerator <- sum(hensax2 * e2)
+denominator <- (sum(hensax2))^2
+sqrt(numerator / denominator)
+```
+
+```{r}
+library(sandwich)
+sqrt(sandwich::vcovHC(model2a, type = "HC"))
+```
+
+## 仮定６：誤差項の正規性
+
+```{r}
+# {normtest} は CRAN から利用できない (https://cran.r-project.org/web/packages/normtest/index.html) ため、
+# https://x.com/M123Takahashi/status/1577950297539780608 の方法を用いる
+
+model1 <- lm(y1 ~ x1, data = data08c)
+resid1 <- residuals(model1)
+model2 <- lm(y2 ~ x1, data = data08c)
+resid2 <- residuals(model2)
+
+n1 <- NROW(data08c)
+sigma1 <- sqrt(sum(resid1^2) / n1)
+s1 <- mean(resid1^3) / sigma1^3
+k1 <- mean(resid1^4) / ((mean(resid1^2))^2)
+JB1 <- n1 * (s1^2 / 6 + ((k1 - 3)^2) / 24)
+print(JB1)
+print(pchisq(q = JB1, df = 2, lower.tail = FALSE))
+
+n2 <- NROW(data08c)
+sigma2 <- sqrt(sum(resid2^2) / n1)
+s2 <- mean(resid2^3) / sigma2^3
+k2 <- mean(resid2^4) / ((mean(resid2^2))^2)
+JB2 <- n2 * (s2^2 / 6 + ((k2 - 3)^2) / 24)
+print(JB2)
+print(pchisq(q = JB2, df = 2, lower.tail = FALSE))
+```
+
+```{r}
+p1 <- ggplot(tibble(resid1), aes(x = resid1)) + geom_histogram()
+p2 <- ggplot(tibble(resid2), aes(x = resid2)) + geom_histogram()
+
+p1 + p2
+```
