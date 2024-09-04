@@ -38,7 +38,7 @@ summary(model1) # 切片は正しく推定できていないが、傾きは正�
 
 ## 仮定２：パラメータ（母数）における線形性
 
-$\beta_0 = 1.0$, $\beta*1 = 1.5$, $\varepsilon_i \sim \mathcal{N}(0, 1)$ , $X_{1i} \sim \mathcal{N}(0, 1)$, $X_{2i} \sim \mathcal{LN}(0, 1)$ とする。
+$\beta_0 = 1.0$, $\beta_1 = 1.5$, $\varepsilon_i \sim \mathcal{N}(0, 1)$ , $X_{1i} \sim \mathcal{N}(0, 1)$, $X_{2i} \sim \mathcal{LN}(0, 1)$ とする。
 
 $$
 \begin{aligned}
