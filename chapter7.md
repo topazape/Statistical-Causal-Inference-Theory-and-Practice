@@ -137,7 +137,12 @@ $\beta_0 = 1.0$, $\beta*1 = 1.5$, $\varepsilon_i \sim \mathcal{N}(0, 1)$
 とする。
 
 $$
-\begin{aligned}Y_{1i} &= \beta_0 + \beta_1 X_{1i} + \varepsilon_i \\Y_{2i} &= \beta_0 + \beta_1 \log{X_{2i}} + \varepsilon_i \\Y_{3i} &= \exp\left( \beta_0 + \beta_1 X_{1i} + \varepsilon_i \right) \\Y_{4i} &= \beta_0 X_{2i}^{\beta_1} e^{\varepsilon_i}\end{aligned}
+\begin{aligned}
+Y_{1i} &= \beta_0 + \beta_1 X_{1i} + \varepsilon_i \\
+Y_{2i} &= \beta_0 + \beta_1 \log{X_{2i}} + \varepsilon_i \\
+Y_{3i} &= \exp\left( \beta_0 + \beta_1 X_{1i} + \varepsilon_i \right) \\
+Y_{4i} &= \beta_0 X_{2i}^{\beta_1} e^{\varepsilon_i}
+\end{aligned}
 $$
 
 ### 線形モデルによる推定
