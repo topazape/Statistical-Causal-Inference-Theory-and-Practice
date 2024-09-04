@@ -1,0 +1,139 @@
+---
+title: "chapter9_交互作用項のある共分散分析"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+library(patchwork)
+
+DATA09 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data09.csv"
+data09 <- read_csv(DATA09)
+```
+
+## 共分散分析の仮定
+
+共分散分析は重回帰モデルの一種のため、仮定１〜仮定６を満たす必要がある。さらに今日分散分析では、仮定７：回帰関数の平行性（homogeneity of regression）を満たす必要がある。
+
+7.  回帰の傾き $\beta_1$ が潜在的結果変数 $Y_i(0)$ と $Y_i(1)$ の間で共通という仮定
+
+仮定７が満たされていない時、交互作用項（interaction term）のあるモデルを使う必要がある。
+
+$$
+Y_i = \beta_0 + \beta_1 X_i + \beta_2 T_i + \beta_3 X_i T_i + \varepsilon_i
+$$
+
+```{r}
+data09 |>
+  mutate(
+    t1 = factor(t1)
+  ) |>
+  ggplot(aes(x = x1, y = y3, shape = t1)) +
+  geom_point(size = 2) +
+  stat_smooth(method = "lm", se = FALSE, fullrange = TRUE, size = 0.5, color = "black") +
+  scale_shape_manual(values = c(2, 1)) +
+  scale_x_continuous(limits = c(0, 110)) +
+  coord_cartesian(xlim = c(0, 110))
+```
+
+$$
+\tau_{ATE} = \mathbb{E}[Y_i (1)] - \mathbb{E}[Y_i(0)]
+$$
+
+```{r}
+print(mean(data09$y1t) - mean(data09$y0t))
+
+model1 <- lm(y3 ~ x1 + t1, data = data09)
+
+# ATE = 108.174 < 108.872 <- 過大に推定されている
+summary(model1)
+```
+
+## 交互作用項のある共分散分析
+
+$$
+\begin{aligned}
+Y_i &= \beta_0 + \beta_1 X_i + \beta_2 T_i + \beta_3 X T_i + \varepsilon_i \\
+Y_i(T_i = 0) &= \beta_0 + \beta_1 X_i + \varepsilon_i \\
+Y_i(T_i = 1) &= (\beta_0 + \beta_2) + (\beta_1 + \beta_3) X_i + \varepsilon_i
+\end{aligned}
+$$
+
+```{r}
+# 交互作用項
+x1t <- data09$x1 * data09$t1
+model2 <- lm(y3 ~ x1 + t1 + x1t, data = data09)
+summary(model2)
+```
+
+平均処置効果を推定できていないように見える。
+
+### 平均処置効果
+
+個体因果効果（ICE）
+
+$$
+\begin{aligned}
+\tau_i &= Y_i(1) - Y_i(0) \\
+\tau_i &= [ (\beta_0 + \beta_2) + (\beta_1 + \beta_3) X_i + \varepsilon_i] -[\beta_0 + \beta_1 X_i + \varepsilon_i] \\
+\tau_i &= \beta_2 + \beta_3 X_i
+\end{aligned}
+$$
+
+平均処置効果（ATE）
+
+$$
+\begin{aligned}
+\tau_{ATE} &= \mathbb{E}[Y_i(1) - Y_i(0)] \\
+\tau_{ATE} &= \mathbb{E}[\beta_2 + \beta_3 X_i] \\
+\tau_{ATE} &= \mathbb{E}[\beta_2] + \mathbb{E}[{\beta_3 X_i}] \\
+\tau_{ATE} &= \beta_2 + \beta_3 \mathbb{E}[X_i]
+\end{aligned}
+$$
+
+```{r}
+library(broom)
+
+b2 <- model2 |> broom::tidy() |> filter(term == "t1") |> pull(estimate)
+b3 <- model2 |> broom::tidy() |> filter(term == "x1t") |> pull(estimate)
+
+b2 + b3 * mean(data09$x1) # 真値 108 を正確に推定できている
+```
+
+### 標準誤差
+
+$\tau_{ATE}$ の標準誤差は、$\tau_{ATE} = \beta_2 + \beta_3 \mathbb{E}[X_i]$ より以下のようになる。
+
+$$
+\begin{aligned}
+\mathrm{var}[\tau_{ATE}] &= \mathrm{var}[\beta_2 + \beta_3 \mathbb{E}[X_i]] \\
+&= var[\beta_2] + \left( \mathbb{E}[X_i] \right)^2 \mathrm{var}[\beta_3] + \mathrm{E}[X_i] 2 \mathrm{cov}[\beta_2, \beta_3] \\
+s.e.(\tau_{ATE}) &= \sqrt{var[\beta_2] + \left( \mathbb{E}[X_i] \right)^2 \mathrm{var}[\beta_3] + \mathrm{E}[X_i] 2 \mathrm{cov}[\beta_2, \beta_3]}
+\end{aligned}
+$$
+
+```{r}
+print(vcov(model2))
+
+v2 <- diag(vcov(model2))[3]
+v3 <- diag(vcov(model2))[4]
+print(v2)
+print(v3)
+
+x1bar <- mean(data09$x1)
+cov23 <- vcov(model2)[3, 4]
+vartau <- v2 + x1bar^2 * v3 + x1bar * 2 * cov23
+setau <- sqrt(vartau)
+setau
+```
+
+### 簡便な方法
+
+```{r}
+x1t2 <- (data09$x1 - mean(data09$x1)) * (data09$t1 - mean(data09$t1))
+model3 <- lm(y3 ~ x1 + t1 + x1t2, data = data09)
+summary(model3)
+```
