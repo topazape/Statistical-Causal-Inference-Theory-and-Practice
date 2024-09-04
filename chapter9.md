@@ -187,9 +187,8 @@ b2 + b3 * mean(data09$x1) # 真値 108 を正確に推定できている
 
 ### 標準誤差
 
-$\tau_{ATE}$
-の標準誤差は、$\tau_{ATE} = \beta_2 + \beta_3 \mathbb{E}[X_i]$
-より以下のようになる。
+$\tau_{ATE}$ の標準誤差は、
+$\tau_{ATE} = \beta_2 + \beta_3 \mathbb{E}[X_i]$ より以下のようになる。
 
 $$
 \begin{aligned}
