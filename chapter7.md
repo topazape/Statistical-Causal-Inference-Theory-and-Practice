@@ -132,9 +132,13 @@ summary(model1) # 切片は正しく推定できていないが、傾きは正�
 
 ## 仮定２：パラメータ（母数）における線形性
 
-\$\$ \_0 = 1.0, = 1.5,\* i\* (0, 1) \\ X{1i} (0, 1), X{2i} (0, 1) \\
+$\beta_0 = 1.0$, $\beta*1 = 1.5$, $\varepsilon_i \sim \mathcal{N}(0, 1)$
+, $X_{1i} \sim \mathcal{N}(0, 1)$, $X_{2i} \sim \mathcal{LN}(0, 1)$
+とする。
 
-\$\$
+$$
+\begin{aligned}Y_{1i} &= \beta_0 + \beta_1 X_{1i} + \varepsilon_i \\Y_{2i} &= \beta_0 + \beta_1 \log{X_{2i}} + \varepsilon_i \\Y_{3i} &= \exp\left( \beta_0 + \beta_1 X_{1i} + \varepsilon_i \right) \\Y_{4i} &= \beta_0 X_{2i}^{\beta_1} e^{\varepsilon_i}\end{aligned}
+$$
 
 ### 線形モデルによる推定
 

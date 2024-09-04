@@ -24,8 +24,8 @@ DATA04 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data04
 
 ## 標準誤差
 
-標本平均 $\bar{X}$ の標準誤差 $s.e.(\bar{X})$ は以下である。ここで、$n$
-は標本サイズ、$\sigma$ は母標準偏差を表す。
+標本平均 $\bar{X}$ の標準誤差 $s.e.(\bar{X})$ は以下である。ここで、 $n$
+は標本サイズ、 $\sigma$ は母標準偏差を表す。
 
 $$
 s.e.(\bar{X}) = \frac{\sigma}{\sqrt{n}}
