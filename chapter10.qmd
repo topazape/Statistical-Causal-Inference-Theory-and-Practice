@@ -1,0 +1,191 @@
+---
+title: "chapter10_傾向スコア"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+library(patchwork)
+
+DATA10A <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data10a.csv"
+DATA10B <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data10b.csv"
+DATA10C <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data10c.csv"
+DATA03 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data03.csv"
+
+data10a <- read_csv(DATA10A)
+data10b <- read_csv(DATA10B)
+data10c <- read_csv(DATA10C)
+data03 <- read_csv(DATA03)
+```
+
+### バランシングスコア
+
+```{r}
+print(data10a |> pull(y1t) |> mean() - data10a |> pull(y0t) |> mean()) # ATE
+data10a |> filter(t1 == 1) |> pull(y1t) |> mean() - data10a |> filter(t1 == 1) |> pull(y0t) |> mean() # ATT
+data10a |> filter(t1 == 1) |> pull(y) |> mean() - data10a |> filter(t1 == 0) |> pull(y) |> mean()
+```
+
+```{r}
+data10a |>
+  ggplot(aes(x = x1, y = t1)) +
+  geom_point()
+```
+
+```{r}
+print(data10a |> filter(t1 == 0) |> pull(x1) |> summary())
+print(data10a |> filter(t1 == 1) |> pull(x1) |> summary())
+```
+
+### 傾向スコア
+
+```{r}
+print(data10b |> filter(t1 == 0) |> pull(x1) |> summary())
+print(data10b |> filter(t1 == 1) |> pull(x1) |> summary())
+print(data10b |> filter(t1 == 0) |> pull(x2) |> summary())
+print(data10b |> filter(t1 == 1) |> pull(x2) |> summary())
+print(data10b |> filter(t1 == 0) |> pull(x3) |> summary())
+print(data10b |> filter(t1 == 1) |> pull(x3) |> summary())
+```
+
+共変量 $X$ が与えられたとき、処置に割り付けられる確率を傾向スコアという。
+
+$$
+e(\mathbf{X}) = \mathrm{Pr}(T_i = 1 | \mathbf{X})
+$$
+
+```{r}
+data10c |> filter(t1 == 1) |> pull(y) |> mean() - data10c |> filter(t1 == 0) |> pull(y) |> mean()
+```
+
+```{r}
+print(data10c |> filter(t1 == 0) |> pull(x1) |> summary())
+print(data10c |> filter(t1 == 1) |> pull(x1) |> summary())
+print(data10c |> filter(t1 == 0) |> pull(x2) |> summary())
+print(data10c |> filter(t1 == 1) |> pull(x2) |> summary())
+print(data10c |> filter(t1 == 0) |> pull(x3) |> summary())
+print(data10c |> filter(t1 == 1) |> pull(x3) |> summary())
+```
+
+## 傾向スコア定理
+
+-   定理１（バランシング）：処置の割り付け $T$ と観測された共変量 $X$ は、傾向スコア $e(X)$ が与えられた時、条件つき独立である。すなわち、傾向スコア $e(X)$ が同じ値であれば、処置群と統制群における多変量の共変量 $X$ の分布は同じであることを意味している。
+
+    $$
+    \mathbf{X} \perp T|e(\mathbf{X})
+    $$
+
+-   定理２（条件付き独立性）：傾向スコア $e(X)$ が与えられれば、潜在的結果変数 $\{Y(1), Y(0)\}$ と割り付け変数 $T$ は条件つき独立である。すなわち、傾向スコアが同じ値となる個体であれば、処置への割り付けは無作為と見做せるということである。
+
+    $$
+    \{Y(1), Y(0)\} \perp T|e(\mathbf{X})
+    $$
+
+傾向スコアのモデリングでは、処置の割り付けに影響を与えるものは観測される共変量 $\mathbf{X}$ のみと仮定しているため、k観測されない共変量 $\mathbf{U}$ のバランシングまでは保証しない。一方実験研究ならば、観測されない $\mathbf{U}$ のバランシングまで保証される。
+
+## 傾向スコアのモデル化
+
+### R による確認
+
+```{r}
+set.seed(1)
+n1 <- 1000
+b0 <- 0.5
+b1 <- 1.1
+x1 <- runif(n = n1, min = -10, max = 10)
+e1 <- rlogis(n = n1, location = 0, scale = 1)
+tstar <- b0 + b1 * x1 + e1
+
+tstar <- tibble(tstar) |>
+  mutate(
+    x1 = x1,
+    t1 = if_else(tstar > 0, 1, 0)
+  )
+
+p1 <- ggplot(tstar, aes(x = x1, y = tstar)) +
+  geom_point(color = "gray50", shape = 1) +
+  geom_smooth(method = "lm", e = FALSE, color = "black", linetype = "dashed")
+
+p2 <- ggplot(tstar, aes(x = x1, y = t1)) +
+  geom_point(color = "gray50", shape = 1) +
+  geom_smooth(method = "loess", span = 0.25, se = FALSE, color = "black", linetype = "dashed")
+
+p1 + p2
+```
+
+### ロジスティック回帰モデル
+
+```{r}
+tibble(x1) |>
+  mutate(
+    tt = plogis(x1)
+  ) |>
+  ggplot(aes(x = x1, y = tt)) + geom_point(shape =1, color = "gray50")
+```
+
+$$
+\mathrm{Pr}(T_i = 1|X_i) = \frac{exp(\beta_0 + \beta_1 X_i)}{1 + exp(\beta_0 + \beta_1 X_i)}
+$$
+
+### 傾向スコアの算出
+
+```{r}
+numerator <- exp(b0 + b1 * x1)
+denominator <- 1 + exp(b0 + b1 * x1)
+p1 <- numerator / denominator
+```
+
+```{r}
+model2 <- tstar |>
+  glm(t1 ~ x1, family = binomial(link = "logit"), data = _)
+
+p2 <- model2$fitted.values
+
+print(summary(model2))
+```
+
+```{r}
+cor(p1, p2)
+```
+
+```{r}
+tibble(p1, p2) |> ggplot(aes(x = p1, y = p2)) + geom_point(shape = 1)
+```
+
+## 傾向スコアのモデル化の例
+
+```{r}
+data03 |> summary()
+```
+
+傾向スコアのモデル化
+
+```{r}
+psmodel <- data03 |> glm(data = _, formula = t1 ~ x1, family = binomial(link = "logit"))
+ps3 <- round(psmodel$fitted.values, digits = 4)
+ps4 <- c(
+  rep(x = 0.8, times = 5),
+  rep(x = 0.6, times = 5),
+  rep(x = 0.4, times = 5),
+  rep(x = 0.2, 5)
+)
+
+df2 <- data03 |> select(x1, y3, t1) |> mutate(ps3, ps4)
+df2
+```
+
+## R パッケージ `MatchIt` による傾向スコアのモデル化
+
+```{r}
+library(MatchIt)
+
+m.out <- MatchIt::matchit(formula = t1 ~ x1, data = data03)
+ps5 <- m.out$model$fitted.values
+
+print(summary(ps3))
+print(summary(ps5))
+print(cor(ps3, ps5))
+```
