@@ -12,3 +12,4 @@
 - [chapter9 交互作用項のある共分散分析](./chapter9.md)
 - [chapter10 傾向スコア](./chapter10.md)
 - [chapter11 傾向スコアマッチング：ATT の推定](./chapter11.md)
+- [chapter12 傾向スコアによる層化解析法及び重み付け法：ATE の推定](./chapter12.md)
