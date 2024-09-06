@@ -1,0 +1,153 @@
+---
+title: "chapter11_傾向スコアマッチング：ATT の推定"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+library(MatchIt)
+
+DATA11 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data11.csv"
+data11 = read_csv(DATA11)
+```
+
+```{r}
+
+```
+
+## 使用するデータ
+
+推定対象の真値
+
+```{r}
+# ATT
+cat("ATT:", data11 |> filter(t1 == 1) |> pull(y1t) |> mean() - data11 |> filter(t1 == 1) |> pull(y0t) |> mean(), "\n")
+# ATE
+cat("ATE:", data11 |> summarize(mean(y1t) - mean(y0t)) |> pull(), "\n")
+```
+
+## ナイーブな比較と共分散分析
+
+ナイーブな比較
+
+```{r}
+data11 |> lm(data = _, formula = y3 ~ t1) |> summary()
+```
+
+共分散分析
+
+```{r}
+data11 |> lm(data = _, formula = y3 ~ t1 + x1 + x2 + x3 + x4 + x5 + x6) |> summary()
+```
+
+## R による復元抽出の傾向スコアマッチング：ATT の推定
+
+#### 傾向スコアマッチングによる ATT の推定１
+
+```{r}
+library(MatchIt)
+
+# 傾向スコアのモデル化
+m.out1 <- data11 |>
+  MatchIt::matchit(
+    data = _,
+    formula = t1 ~ x1 + x2 + x3 + x4 + x5 + x6,
+    replace = TRUE, # 復元抽出
+    distance = "glm", # ロジスティク回帰によって計算された傾向スコアを距離として用いる
+    method = "nearest", # 最近隣法
+  )
+# マッチング後のデータを作成
+m.data1 <- match.data(m.out1)
+m.data1
+```
+
+```{r}
+cat("元データ:", NROW(data11), "マッチング後のデータ:", NROW(m.data1), "\n")
+# マッチング後のデータから ATT の推定を行う; 復元のマッチングのため、weight にマッチングの重みを設定
+model1 <- lm(y3 ~ t1, data = m.data1, weights = m.data1$weights)
+# マッチング後のデータから ATT の推定を行う; 復元のマッチングのため、weight にマッチングの重みを設定
+model2 <- lm(y3 ~ t1 + x1 + x2 + x3 + x4 + x5 + x6, data = m.data1, weights = m.data1$weights)
+
+summary(model1)
+summary(model2)
+```
+
+理論上、傾向スコアマッチングによって共変量の影響による偏りを除去して ATT を推定できるため、マッチング後のデータを用いて平均値の差を計算すれば良い。しかし、わずかなインバランスが残っている場合があり、解析モデルにも共変量を取り込むことが推奨される。ただし、傾向スコアモデルに含めなかった変数を解析モデルに取り入れると偏りが発生する恐れがある。
+
+#### 傾向スコアマッチングによる ATT の推定２（非復元による最近隣法（推奨されない）の場合）
+
+```{r}
+# 傾向スコアのモデル化
+m.out2 <- data11 |>
+  MatchIt::matchit(
+    data = _,
+    formula = t1 ~ x1 + x2 + x3 + x4 + x5 + x6,
+    replace = FALSE, # 非復元抽出
+    distance = "glm", # ロジスティク回帰によって計算された傾向スコアを距離として用いる
+    method = "nearest", # 最近隣法
+  )
+# マッチング後のデータを作成
+m.data2 <- match.data(m.out2)
+m.data2
+```
+
+```{r}
+cat("元データ:", NROW(data11), "マッチング後のデータ:", NROW(m.data2), "\n")
+# マッチング後のデータから ATT の推定を行う
+model3 <- lm(y3 ~ t1, data = m.data2)
+# マッチング後のデータから ATT の推定を行う
+model4 <- lm(y3 ~ t1 + x1 + x2 + x3 + x4 + x5 + x6, data = m.data2)
+
+summary(model3)
+summary(model4)
+```
+
+## 標準誤差について（クラスターに頑健な標準誤差）
+
+クラスターに頑健な標準誤差を使用することで、標準誤差が `0.4026` から `0.675` となる。95% 信頼区間には `0` は含まれないので統計的に有意な結論といえる。
+
+```{r}
+library(lmtest)
+library(sandwich)
+
+# replace = TRUE なら weights を指定する. culster = ~ weights という指定もできる
+lmtest::coeftest(model2, vcov. = sandwich::vcovCL, cluster = model2$weights)
+# 95% 信頼区間
+lmtest::coefci(model2, level = 0.95, vcov. = sandwich::vcovCL, cluster = model2$weights)
+```
+
+## 傾向スコアによるバランシングの評価
+
+`Std. Mean Diff` の値が `0` に近く、 `Var. Ratio` の値が `1` に近ければ、バランシングが取れていることを意味する。
+
+```{r}
+summary(m.out1)
+```
+
+```{r}
+diffa <- abs(summary(m.out1)$sum.all[ , 3])
+diffb <- abs(summary(m.out1)$sum.matched[ , 3])
+diff1 <- rev(diffa)
+diff2 <- rev(diffb)
+maxx <- max(diff1, diff2)
+labels0 <- rownames(summary(m.out1)$sum.all)
+labels1 <- rev(labels0)
+dotchart(diff1, xlim = c(0, maxx), labels = c(labels1))
+abline(v = 0.00, col = 8)
+abline(v = 0.10, col = 8)
+abline(v = 0.05, lty = 2, col = 8)
+par(new = TRUE)
+dotchart(diff2, xlim = c(0, maxx), labels = c(labels1), pch = 16, xlab = "Absolute Standardized Mean Difference")
+```
+
+```{r}
+plot(summary(m.out1), position = NULL)
+```
+
+```{r}
+library(cobalt)
+cobalt::love.plot(m.out1, abs = TRUE)
+```
