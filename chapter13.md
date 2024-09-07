@@ -175,7 +175,10 @@ summary(modelDiag1)
 squares）による回帰モデルによって計算することもできる。
 
 $$
-Y_i = \beta_0 + \beta_1 X_{1i} +  U_i \\
+Y_i = \beta_0 + \beta_1 X_{1i} +  U_i
+$$
+
+$$
 \mathrm{cov}[X_1, U] \ne 0
 $$
 
