@@ -15,3 +15,4 @@
 - [chapter12 傾向スコアによる層化解析法及び重み付け法：ATE の推定](./chapter12.md)
 - [chapter13 操作変数法の基礎](./chapter13.md)
 - [chapter14 操作変数法による非遵守への対処](./chapter14.md)
+- [chapter15 回帰不連続デザインの基礎](./chapter15.md)
