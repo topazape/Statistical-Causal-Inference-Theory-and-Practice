@@ -1,6 +1,6 @@
 ---
 title: "chapter18_ファジーな回帰不連続デザイン"
-format: html
+format: gfm
 editor: visual
 ---
 
