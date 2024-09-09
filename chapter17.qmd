@@ -1,0 +1,177 @@
+---
+title: "chapter17_回帰不連続デザインの仮定および実践"
+format: gfm
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+library(patchwork)
+
+DATA17A <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data17a.csv"
+DATA17B <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data17b.csv"
+
+data17a <- read_csv(DATA17A)
+data17b <- read_csv(DATA17B)
+```
+
+## 連続性の仮定と強制変数の操作
+
+回帰不連続デザインの識別性の条件、連続性の仮定は、潜在的結果変数 $\{ Y(0), Y(1) \}$ の条件付き分布に連続性があるという意味である。この仮定が満たされない典型例は、閾値の存在が知られていて強制変数 $X$ の値が操作できる場合である。
+
+### グラフによる連続性の仮定の診断
+
+```{r}
+summary(data17a)
+```
+
+強制変数 `x1` には操作は行われておらず、強制変数 `x2` には操作が行われている。
+
+グラフによる診断１
+
+```{r}
+p1 <- ggplot(data17a, aes(x = x1)) + geom_histogram(bins = 17) + geom_vline(xintercept = 60)
+p2 <- ggplot(data17a, aes(x = x1)) + geom_density() + geom_vline(xintercept = 60)
+
+p1 + p2
+```
+
+閾値 `60` の前後には得意な状況は発見されていない。
+
+グラフによる診断２
+
+```{r}
+p3 <- ggplot(data17a, aes(x = x2)) + geom_histogram(bins = 17) + geom_vline(xintercept = 60)
+p4 <- ggplot(data17a, aes(x = x2)) + geom_density() + geom_vline(xintercept = 60)
+
+p3 + p4
+```
+
+### フォーマルな検定による連続性の仮定の診断
+
+強制変数の操作の検定
+
+```{r}
+library(rddensity)
+
+summary(rddensity(data17a$x1, c = 60))
+summary(rddensity(data17a$x2, c = 60))
+```
+
+## R パッケージ `rdrobust` による分析：上級編
+
+```{r}
+df3 <- data17b |> drop_na()
+summary(df3)
+```
+
+データの可視化１
+
+```{r}
+c1 <- 59.1984
+
+p5 <- df3 |>
+  ggplot(aes(x = x1, y = y1)) +
+  geom_point(shape = 1) +
+  geom_vline(xintercept = c1)
+
+p6 <- df3 |>
+  ggplot(aes(x = x1, y = y1)) +
+  geom_point(shape = 1) +
+  geom_vline(xintercept = c1) +
+  coord_cartesian(
+    ylim = c(0, 10)
+  )
+
+p5 + p6
+```
+
+データの可視化２
+
+```{r}
+library(rdrobust)
+
+rdrobust::rdplot(y = df3$y1, x = df3$x1, c = c1)
+```
+
+### 連続性の仮定の診断
+
+```{r}
+p7 <- ggplot(df3, aes(x = x1)) +
+  geom_histogram() +
+  geom_vline(xintercept = c1) +
+  labs(title = "強制変数のヒストグラム") +
+  theme(text = element_text(family = "Hiragino Sans"))
+  
+p8 <- ggplot(df3, aes(x = x1)) +
+  geom_density() +
+  geom_vline(xintercept = c1) +
+  labs(title = "強制変数の分布") +
+  theme(text = element_text(family = "Hiragino Sans"))
+
+p7 + p8
+```
+
+Cattaneo, Jansson, and Ma (2019, 2020) の検定
+
+```{r}
+library(rddensity)
+
+summary(rddensity::rddensity(X = df3$x1, c = c1))
+```
+
+連続性の仮定に問題はないと判断でき、回帰不連続デザインによって閾値における局所的な平均処置効果を推定できる。
+
+### 解析１：共変量なし
+
+```{r}
+IKband <- rdrobust::rdbwselect_2014(y = df3$y1, x = df3$x1, c = c1, bwselect = "IK")
+model1 <- rdrobust::rdrobust(y = df3$y1, x = df3$x1, c = c1, h = IKband$bws[1, 1], all = TRUE)
+summary(model1)
+```
+
+-   Method（Conventional と比べて、大幅に変化が起きていなければ良い）
+
+    -   Conventional
+
+        -   通常の回帰不連続デザインの出力結果
+
+    -   Bias-Corrected
+
+        -   `rdrobust` 特有の手法を用いてバイアスを修正した結果
+
+    -   Robust
+
+        -   `rdrobust` 特有の手法を用いてバイアスを頑健化した結果
+
+```{r}
+# cerrd: coverage error raet regression discontinuity
+# カバー率の誤差の意味で最適なバンド幅を用いることで偏りを是正し、適切な信頼区間を構築できる、とする
+model2 <- rdrobust::rdrobust(y = df3$y1, x = df3$x1, c = c1, bwselect = "cerrd", all = TRUE)
+summary(model2)
+```
+
+```{r}
+model3 <- rdrobust::rdrobust(y = df3$y1, x = df3$x1, c = c1, bwselect = "mserd", all = TRUE)
+summary(model3)
+```
+
+### 共変量の追加
+
+共変量は、バンド幅の推定にも利用した上で、解析モデルにも含めることで、精度が最も良くなる。
+
+### 解析２：共変量あり
+
+```{r}
+zs <- cbind(df3$z1, df3$z2, df3$z3, df3$z4, df3$z5, df3$z6, df3$z7, df3$z8, df3$z9)
+
+model4 <- rdrobust::rdrobust(y = df3$y1, x = df3$x1, c = c1, covs = zs, bwselect = "cerrd", all = TRUE)
+summary(model4)
+```
+
+```{r}
+model5 <- rdrobust::rdrobust(y = df3$y1, x = df3$x1, c = c1, covs = zs, bwselect = "mserd", all = TRUE)
+summary(model5)
+```

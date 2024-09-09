@@ -17,3 +17,4 @@
 - [chapter14 操作変数法による非遵守への対処](./chapter14.md)
 - [chapter15 回帰不連続デザインの基礎](./chapter15.md)
 - [chapter16 回帰不連続デザインの応用](./chapter16.md)
+- [chapter17 回帰不連続デザインの仮定および実践](./chapter17.md)
