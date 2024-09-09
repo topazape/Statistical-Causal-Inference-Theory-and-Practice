@@ -1,6 +1,6 @@
 ---
 title: "chapter16_回帰不連続デザインの応用"
-format: html
+format: gfm
 editor: visual
 ---
 
