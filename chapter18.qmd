@@ -1,0 +1,61 @@
+---
+title: "chapter18_ファジーな回帰不連続デザイン"
+format: html
+editor: visual
+---
+
+## 前準備
+
+```{r}
+library(tidyverse)
+
+DATA18 <- "https://raw.githubusercontent.com/mtakahashi123/causality/main/data18.csv"
+data18 <- read_csv(DATA18)
+```
+
+## 使用するデータ
+
+```{r}
+data18 |>
+  ggplot(aes(x = enroll, y = class)) +
+  geom_point(shape = 1) +
+  geom_vline(xintercept = 40, linetype = "dashed") +
+  geom_vline(xintercept = 80, linetype = "dashed") +
+  geom_vline(xintercept = 120, linetype = "dashed") +
+  geom_smooth(method = "loess", se =FALSE, span = 0.15, color = "black")
+```
+
+## R によるファジー RDD
+
+二段階最小二乗法によるファジーRDD
+
+```{r}
+data18a <- data18 |>
+  mutate(
+    h1 = 36 <= enroll & enroll <= 45,
+    h2 = 76 <= enroll & enroll <= 85,
+    h3 = 116 <= enroll & enroll <= 125,
+  ) |>
+  filter(h1 | h2 | h3)
+
+first <- data18a |> lm(data = _, formula = class ~ fsc + pctdis + enroll)
+data18b <- data18a |>
+  mutate(
+    x1hat = predict(first)
+  )
+second <- data18b |> lm(data = _, math ~ x1hat + pctdis + enroll)
+summary(second)
+```
+
+R パッケージ `AER` によるファジーRDD
+
+```{r}
+library(AER)
+# libray(ivpack)
+
+modelIV <- data18a |>
+  AER::ivreg(formula = math ~ class + pctdis + enroll | fsc + pctdis + enroll, data = _)
+
+summary(modelIV)
+# ivpack が CRAN から削除されたため、クラスター頑健標準誤差を計算できない
+```

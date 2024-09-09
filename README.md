@@ -18,3 +18,4 @@
 - [chapter15 回帰不連続デザインの基礎](./chapter15.md)
 - [chapter16 回帰不連続デザインの応用](./chapter16.md)
 - [chapter17 回帰不連続デザインの仮定および実践](./chapter17.md)
+- [chapter18 ファジーな回帰不連続デザイン](./chapter18.md)
