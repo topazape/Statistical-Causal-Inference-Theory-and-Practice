@@ -399,7 +399,7 @@ $$
 カーネル密度推定量を $\hat{p}$ とし MSE に応用すると以下になる。
 
 $$
-MSE[\hat{p}(x)] = \mathbb{E}[ \left\{ \hat{p}(x) - p(x) \right\}^2 ]
+MSE[\hat{p}(x)] = \mathbb{E}[ \left( \hat{p}(x) - p(x) \right)^2 ]
 $$
 
 以下を平均積分二乗誤差（MISE: mean integrated squared
